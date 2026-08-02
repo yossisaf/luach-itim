@@ -1,0 +1,29 @@
+[versions]
+agp = "8.5.2"
+android-compileSdk = "35"
+android-minSdk = "26"
+android-targetSdk = "35"
+androidx-activityCompose = "1.9.3"
+androidx-core-ktx = "1.15.0"
+compose-plugin = "1.7.3"
+kotlin = "2.1.0"
+pdfbox = "3.0.3"
+kosherjava = "2.4.0"
+coroutines = "1.9.0"
+
+[libraries]
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version = "2.0.27.0" }
+pdfbox-desktop = { group = "org.apache.pdfbox", name = "pdfbox", version.ref = "pdfbox" }
+kosherjava = { group = "com.kosherjava", name = "zmanim", version.ref = "kosherjava" }
+coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+[plugins]
+androidApplication = { id = "com.android.application", version.ref = "agp" }
+jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
