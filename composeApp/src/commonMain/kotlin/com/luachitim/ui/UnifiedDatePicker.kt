@@ -38,27 +38,32 @@ import com.luachitim.util.jdToHebrew
  */
 private val WEEKDAY_INITIALS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 
-private val HEBREW_MONTH_NAMES_REGULAR = listOf(
+// NOTE: these were originally `private`. They're now `internal` so
+// ClassicCalendarScreen.kt (the new "classic calendar" view) can reuse the
+// exact same month-name / day-numeral tables and Gregorian leap-year helpers
+// instead of duplicating them - avoids any risk of the two views silently
+// drifting out of sync with each other.
+internal val HEBREW_MONTH_NAMES_REGULAR = listOf(
     1 to "ניסן", 2 to "אייר", 3 to "סיוון", 4 to "תמוז", 5 to "אב", 6 to "אלול",
     7 to "תשרי", 8 to "חשוון", 9 to "כסלו", 10 to "טבת", 11 to "שבט", 12 to "אדר"
 )
-private val HEBREW_MONTH_NAMES_LEAP = listOf(
+internal val HEBREW_MONTH_NAMES_LEAP = listOf(
     1 to "ניסן", 2 to "אייר", 3 to "סיוון", 4 to "תמוז", 5 to "אב", 6 to "אלול",
     7 to "תשרי", 8 to "חשוון", 9 to "כסלו", 10 to "טבת", 11 to "שבט",
     12 to "אדר א", 13 to "אדר ב"
 )
-private val HEBREW_DAY_NUM = listOf(
+internal val HEBREW_DAY_NUM = listOf(
     "", "א","ב","ג","ד","ה","ו","ז","ח","ט","י",
     "יא","יב","יג","יד","טו","טז","יז","יח","יט","כ",
     "כא","כב","כג","כד","כה","כו","כז","כח","כט","ל"
 )
-private val GREGORIAN_MONTH_NAMES = listOf(
+internal val GREGORIAN_MONTH_NAMES = listOf(
     1 to "ינואר", 2 to "פברואר", 3 to "מרץ", 4 to "אפריל", 5 to "מאי", 6 to "יוני",
     7 to "יולי", 8 to "אוגוסט", 9 to "ספטמבר", 10 to "אוקטובר", 11 to "נובמבר", 12 to "דצמבר"
 )
 
-private fun isGregorianLeap(year: Int) = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
-private fun daysInGregorianMonth(year: Int, month: Int): Int = when (month) {
+internal fun isGregorianLeap(year: Int) = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+internal fun daysInGregorianMonth(year: Int, month: Int): Int = when (month) {
     1, 3, 5, 7, 8, 10, 12 -> 31
     4, 6, 9, 11            -> 30
     2                       -> if (isGregorianLeap(year)) 29 else 28

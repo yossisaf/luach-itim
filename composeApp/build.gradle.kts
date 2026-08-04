@@ -104,6 +104,10 @@ kotlin {
             implementation(libs.pdfbox.android)
             implementation(libs.kosherjava)
             implementation(libs.coroutines.android)
+            // androidx.core.content.pm.ShortcutInfoCompat / ShortcutManagerCompat
+            // and androidx.core.graphics.drawable.IconCompat - used by the
+            // "daily icon" pinned-shortcut feature (see widget/DynamicIconShortcut.kt).
+            implementation(libs.androidx.core.ktx)
             // Provides the Theme.Material3.DayNight.NoActionBar base theme used in
             // styles.xml (this is the app's actual root Android theme, unrelated to
             // Compose's own Material3 - it must stay even without the old picker).

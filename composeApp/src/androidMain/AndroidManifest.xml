@@ -85,6 +85,33 @@
                 android:resource="@xml/luach_widget_info" />
         </receiver>
 
+        <!-- Home-screen widget: renders the actual PDF page ("עמוד ב'") of
+             the current week - see LuachPageWidgetProvider kdoc. -->
+        <receiver
+            android:name=".widget.LuachPageWidgetProvider"
+            android:exported="true"
+            android:label="@string/page_widget_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/luach_page_widget_info" />
+        </receiver>
+
+        <!-- Refreshes the daily-icon pinned shortcut and the page widget at
+             midnight - see MidnightIconReceiver kdoc. Same exempt-broadcast
+             set as the two widget providers above. -->
+        <receiver
+            android:name=".widget.MidnightIconReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Used only to share the generated .ics export file via the share sheet -->
         <provider
             android:name="androidx.core.content.FileProvider"

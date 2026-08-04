@@ -465,6 +465,8 @@ fun MainScreen(
     var showDatePicker by remember { mutableStateOf(false) }  // unified Hebrew/Gregorian picker
     var showDiary        by remember { mutableStateOf(false) }
     var showDayMenu      by remember { mutableStateOf(false) }  // quick menu after tapping a day
+    // "Classic calendar" full-month-grid view, toggled from the bottom nav.
+    var showClassicCalendar by remember { mutableStateOf(false) }
     // Bumped whenever diary events change (diary closed, ICS import) so the
     // calendar's cached per-week event lookup knows it's stale - see
     // PdfPagesView's `remember(weekStartJd, eventsVersion)` below.
@@ -494,12 +496,13 @@ fun MainScreen(
     // Bars only toggle on tap — no auto-hide timer
 
     // ── Back button logic ─────────────────────────────────────────────────
-    // Priority: close overlay → go to today → exit
+    // Priority: close classic-calendar → close overlay → go to today → exit
     val anyOverlay = showPicker || showMenu || showSettings ||
                      showManage || showAbout || showDatePicker || showDiary || showDayMenu
 
     AppBackHandler(enabled = true) {
         when {
+            showClassicCalendar -> showClassicCalendar = false
             anyOverlay -> {
                 showPicker = false; showMenu   = false; showSettings  = false
                 showManage = false; showAbout  = false; showDatePicker = false; showDiary = false; showDayMenu = false
@@ -594,6 +597,7 @@ fun MainScreen(
                 canPrev = weekIndex > 0,
                 canNext = weekIndex < totalWeeks - 1,
                 isOnToday = isOnToday,
+                onClassicView = { showClassicCalendar = true },
                 surf = surf, gold = gold
             )
         }
@@ -670,6 +674,23 @@ fun MainScreen(
             onDismiss  = { showManage = false })
 
         if (showAbout) AboutDialog(surf, gold, txt, sub, onDismiss = { showAbout = false })
+
+        // "Classic calendar" — full-month grid view (Hebrew/Gregorian toggle),
+        // opened from the 4th bottom-nav button. Drawn last so it sits above
+        // everything else, matching how the other full-screen overlays behave.
+        if (showClassicCalendar) {
+            ClassicCalendarScreen(
+                repo = repo, initialJd = selectedDayJd, inIsrael = inIsrael,
+                eventsVersion = eventsVersion,
+                bg = bg, surf = surf, gold = gold, txt = txt, sub = sub,
+                onDaySelected = { jd ->
+                    onDaySelected(jd)
+                    val (jgy, jgm, jgd) = repo.jdToGregorian(jd)
+                    onWeekChange(repo.findWeekIndexForDate(jgy, jgm, jgd, inIsrael, hebrewYear))
+                },
+                onClose = { showClassicCalendar = false }
+            )
+        }
     }
 }
 
@@ -1291,6 +1312,25 @@ fun IconPlus(color: Color, size: Dp = 20.dp) {
     }
 }
 
+/** Grid / classic-calendar icon - a 2×2 rounded-square grid, used for the
+ *  "לוח רגיל" (classic month-grid view) bottom-nav button. Deliberately a
+ *  different shape from IconCalendar (which already denotes the diary
+ *  button) so the two never get confused for the same action. */
+@Composable
+fun IconGrid(color: Color, size: Dp = 20.dp) {
+    Canvas(Modifier.size(size)) {
+        val s = this.size.width
+        val st = s * 0.09f
+        val gap = s * 0.14f
+        val cell = (s - gap) / 2f - st
+        for (r in 0..1) for (c in 0..1) {
+            val x = c * (cell + gap + st)
+            val y = r * (cell + gap + st)
+            drawRoundRect(color, Offset(x, y), Size(cell, cell), CornerRadius(s * 0.06f), style = Stroke(st))
+        }
+    }
+}
+
 // ── Top Bar ───────────────────────────────────────────────────────────────
 @Composable
 fun TopBar(
@@ -1408,6 +1448,7 @@ fun TopBar(
 fun BottomNav(
     onPrev: () -> Unit, onToday: () -> Unit, onNext: () -> Unit,
     canPrev: Boolean, canNext: Boolean, isOnToday: Boolean,
+    onClassicView: () -> Unit,
     surf: Color, gold: Color
 ) {
     val navPad = WindowInsets.navigationBars.asPaddingValues()
@@ -1448,9 +1489,19 @@ fun BottomNav(
             // Next (RTL: left chevron = next week)
             NavPillButton(
                 onClick = onNext, enabled = canNext,
-                isFirst = false, isLast = true,
+                isFirst = false, isLast = false,
                 gold = gold
             ) { IconChevronLeft(if (canNext) gold else gold.copy(.22f), 20.dp) }
+
+            // Divider
+            Box(Modifier.width(1.dp).height(32.dp).background(gold.copy(.15f)))
+
+            // Classic calendar (full month grid) — opens as a full-screen overlay
+            NavPillButton(
+                onClick = onClassicView, enabled = true,
+                isFirst = false, isLast = true,
+                gold = gold
+            ) { IconGrid(gold, 18.dp) }
         }
     }
 }
@@ -1699,6 +1750,13 @@ fun SettingsScreen(settings: AppSettings, repo: LuachRepository, surf: Color, go
                             )
                         }
                     }
+
+                    // ── Daily-changing home-screen shortcut icon ─────────
+                    // Real app icons can't be redrawn at runtime on Android -
+                    // this renders as a separate pinned shortcut whose OWN
+                    // icon bitmap is regenerated every day. No-op on Desktop
+                    // (see DailyIconSetting.desktop.kt).
+                    DailyIconSettingRow(gold = gold, sub = sub)
 
                     // ── Diary export / import (ICS) ──────────────────────
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
