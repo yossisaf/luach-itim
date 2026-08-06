@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">לוח עתים לבינה</string>
-    <string name="widget_description">פרשת השבוע והתאריך העברי של היום</string>
-    <string name="page_widget_description">עמוד הלוח של השבוע הנוכחי</string>
-</resources>
