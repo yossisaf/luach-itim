@@ -597,7 +597,6 @@ fun MainScreen(
                 canPrev = weekIndex > 0,
                 canNext = weekIndex < totalWeeks - 1,
                 isOnToday = isOnToday,
-                onClassicView = { showClassicCalendar = true },
                 surf = surf, gold = gold
             )
         }
@@ -691,6 +690,29 @@ fun MainScreen(
                 onClose = { showClassicCalendar = false }
             )
         }
+
+        // Standalone "classic calendar" toggle — deliberately NOT one of the
+        // connected pill buttons in BottomNav anymore, and NOT gated by
+        // showControls or drawn underneath the classic-calendar overlay: it
+        // is the very last thing composed in this Box, so it always sits on
+        // top and stays reachable even while the classic calendar itself is
+        // open — tapping it there closes it and returns to the PDF view.
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(WindowInsets.navigationBars.asPaddingValues())
+                .padding(start = 20.dp, bottom = 20.dp)
+                .size(48.dp)
+                .shadow(6.dp, CircleShape)
+                .clip(CircleShape)
+                .background(surf.copy(alpha = 0.94f))
+                .border(1.dp, gold.copy(alpha = 0.18f), CircleShape)
+                .clickable { showClassicCalendar = !showClassicCalendar }
+                .semantics { contentDescription = if (showClassicCalendar) "חזרה ללוח" else "לוח רגיל" },
+            contentAlignment = Alignment.Center
+        ) {
+            IconGrid(gold, 20.dp)
+        }
     }
 }
 
@@ -763,6 +785,62 @@ fun PdfPagesView(
         val asp2raw = if (pw2 > 0f) ph2 / pw2 else 1.414f
         val asp2    = if (compactView) asp2raw / (1f - cut) else asp2raw
 
+        val gap = 16f
+
+        // baseX/baseY re-center the page whenever it's smaller than the
+        // viewport, and both depend on the CURRENT zoom (rw = cw*z, and the
+        // page's rendered height with it). Any zoom-around-a-point gesture
+        // (pinch, double-tap, the +/- buttons) needs to know baseX/baseY at
+        // BOTH the old and the new zoom level to correctly re-anchor on the
+        // touch/click point - using only cOx/cOy (as an earlier version of
+        // this code did) silently ignores how much baseX/baseY themselves
+        // shift between those two zoom levels, so the zoom center drifted
+        // away from the actual pinch midpoint / double-tap point / button
+        // click more and more as it moved away from baseX/baseY = 0.
+        fun baseXFor(z: Float): Float = (cw - cw * z) / 2f
+        fun baseYFor(z: Float): Float {
+            val rwFor  = cw * z
+            val hFor   = rwFor * asp1 + rwFor * asp2 + gap
+            return if (hFor < ch) (ch - hFor) / 2f else (ch - hFor)
+        }
+
+        // ── Minimum zoom: the calendar may never render smaller than the
+        // screen ─────────────────────────────────────────────────────────
+        // rw (rendered width) is always exactly cw*z, so z=1 is precisely
+        // the point below which the page would be narrower than the
+        // viewport (blank margins left/right). Separately, the STACKED
+        // page height (rw*asp1 + rw*asp2 + gap) also scales with z - on an
+        // unusually tall/narrow viewport that height can dip below the
+        // viewport's own height (ch) even at z=1, leaving blank space
+        // above/below instead. Which of the two ever actually binds
+        // depends on the device's screen shape (portrait vs landscape,
+        // narrow phone vs tablet) - so the true floor is whichever of the
+        // two needs MORE zoom. This never limits zooming IN, and panning
+        // is never clamped, so the user can still scroll to reach every
+        // edge of the document.
+        // Wrapped in remember(cw, ch, asp1, asp2) — NOT recomputed on every
+        // pinch/pan frame (those only change cZ/cOx/cOy, not these four),
+        // so this adds zero per-frame cost during an active gesture.
+        val minZoom = remember(cw, ch, asp1, asp2) {
+            val heightMinZoom = if (cw > 0f) (ch - gap) / (cw * (asp1 + asp2)) else 1f
+            if (heightMinZoom > 1f) heightMinZoom else 1f
+        }
+
+        // If the live zoom is currently below that floor - e.g. a zoom
+        // restored from a previous, larger window/screen, or a live
+        // resize/rotation that just raised the floor - snap it up right
+        // now, anchored on the viewport center (same math as the +/-
+        // buttons) so the page doesn't jump, rather than momentarily
+        // showing it smaller than the screen.
+        if (cZ < minZoom) {
+            val centroid = Offset(cw / 2f, ch / 2f)
+            val ratio    = minZoom / cZ
+            val newOx = centroid.x - baseXFor(minZoom) - ratio * (centroid.x - baseXFor(cZ) - cOx)
+            val newOy = centroid.y - baseYFor(minZoom) - ratio * (centroid.y - baseYFor(cZ) - cOy)
+            cZ = minZoom; cOx = newOx; cOy = newOy
+            onTransform(cZ, cOx, cOy)
+        }
+
         val rw  = (cw * cZ).toInt().coerceAtLeast(100)
         val rh1 = (rw * asp1).toInt()
         val rh2 = (rw * asp2).toInt()
@@ -802,7 +880,6 @@ fun PdfPagesView(
             }
         }
 
-        val gap    = 16f
         val totalH = rh1 + rh2 + gap
         val baseX  = (cw - rw) / 2f
         // When the pages are taller than the viewport (the normal case),
@@ -810,23 +887,6 @@ fun PdfPagesView(
         // grid) is what matters here, not page 1, so the default/reset view
         // should start there rather than scrolled up to the top of page 1.
         val baseY  = if (totalH < ch) (ch - totalH) / 2f else (ch - totalH)
-
-        // baseX/baseY re-center the page whenever it's smaller than the
-        // viewport, and both depend on the CURRENT zoom (rw = cw*z, and the
-        // page's rendered height with it). Any zoom-around-a-point gesture
-        // (pinch, double-tap, the +/- buttons) needs to know baseX/baseY at
-        // BOTH the old and the new zoom level to correctly re-anchor on the
-        // touch/click point - using only cOx/cOy (as an earlier version of
-        // this code did) silently ignores how much baseX/baseY themselves
-        // shift between those two zoom levels, so the zoom center drifted
-        // away from the actual pinch midpoint / double-tap point / button
-        // click more and more as it moved away from baseX/baseY = 0.
-        fun baseXFor(z: Float): Float = (cw - cw * z) / 2f
-        fun baseYFor(z: Float): Float {
-            val rwFor  = cw * z
-            val hFor   = rwFor * asp1 + rwFor * asp2 + gap
-            return if (hFor < ch) (ch - hFor) / 2f else (ch - hFor)
-        }
 
         val pdfFilter = if (nightMode) nightColorFilter else null
         val phColor   = if (nightMode) Color(0xFF1A1A1A) else Color(0xFFD8D0C0)
@@ -858,7 +918,7 @@ fun PdfPagesView(
             .pointerInput(Unit) {
                 detectTransformGestures { centroid, pan, gestureZoom, _ ->
                     onGestureStart()
-                    val newZ = (cZ * gestureZoom).coerceIn(0.4f, 6f)
+                    val newZ = (cZ * gestureZoom).coerceIn(minZoom, 6f)
                     val ratio = newZ / cZ
                     cOx = centroid.x - baseXFor(newZ) - ratio * (centroid.x - baseXFor(cZ) - cOx) + pan.x
                     cOy = centroid.y - baseYFor(newZ) - ratio * (centroid.y - baseYFor(cZ) - cOy) + pan.y
@@ -893,8 +953,10 @@ fun PdfPagesView(
                     onDoubleTap = { tapOffset ->
                         currentOnGestureStart()
                         if (cZ >= 2f) {
-                            // Already zoomed in — reset to fit
-                            cZ = 1f; cOx = 0f; cOy = 0f
+                            // Already zoomed in — reset to fit (the computed
+                            // floor, not a hardcoded 1f, so this never lands
+                            // below the "can't be smaller than the screen" limit)
+                            cZ = minZoom; cOx = 0f; cOy = 0f
                         } else {
                             // Zoom into the exact point that was double-tapped
                             val newZoom = 2.5f
@@ -1033,7 +1095,7 @@ fun PdfPagesView(
         if (isDesktopPlatform()) {
             fun zoomBy(factor: Float) {
                 val centroid = Offset(cw / 2f, ch / 2f)
-                val newZ  = (cZ * factor).coerceIn(0.4f, 6f)
+                val newZ  = (cZ * factor).coerceIn(minZoom, 6f)
                 val ratio = newZ / cZ
                 cOx = centroid.x - baseXFor(newZ) - ratio * (centroid.x - baseXFor(cZ) - cOx)
                 cOy = centroid.y - baseYFor(newZ) - ratio * (centroid.y - baseYFor(cZ) - cOy)
@@ -1448,7 +1510,6 @@ fun TopBar(
 fun BottomNav(
     onPrev: () -> Unit, onToday: () -> Unit, onNext: () -> Unit,
     canPrev: Boolean, canNext: Boolean, isOnToday: Boolean,
-    onClassicView: () -> Unit,
     surf: Color, gold: Color
 ) {
     val navPad = WindowInsets.navigationBars.asPaddingValues()
@@ -1489,19 +1550,9 @@ fun BottomNav(
             // Next (RTL: left chevron = next week)
             NavPillButton(
                 onClick = onNext, enabled = canNext,
-                isFirst = false, isLast = false,
-                gold = gold
-            ) { IconChevronLeft(if (canNext) gold else gold.copy(.22f), 20.dp) }
-
-            // Divider
-            Box(Modifier.width(1.dp).height(32.dp).background(gold.copy(.15f)))
-
-            // Classic calendar (full month grid) — opens as a full-screen overlay
-            NavPillButton(
-                onClick = onClassicView, enabled = true,
                 isFirst = false, isLast = true,
                 gold = gold
-            ) { IconGrid(gold, 18.dp) }
+            ) { IconChevronLeft(if (canNext) gold else gold.copy(.22f), 20.dp) }
         }
     }
 }
